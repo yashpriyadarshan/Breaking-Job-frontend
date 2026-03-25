@@ -8,8 +8,8 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
-  base: '/Breaking-Job-frontend/',
   server: {
     port: 3000
   },
+    base: '/Breaking-Job-frontend/'
 })
