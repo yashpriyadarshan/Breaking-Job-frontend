@@ -11,8 +11,8 @@
 }
 
 .login-signup-box {
-    height: 600px;
-    min-width: 420px;
+    padding: 12px 12px;
+    min-height: 480px;
     background: white;
     border-radius: 23px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
@@ -35,11 +35,10 @@
     justify-content: center;
     flex-direction: column;
     gap: 30px;
-    margin-top: 50px;
+    margin-top: 30px;
 }
 
 .login-signup-form {
-    margin-top: 30px;
     width: 340px;
 }
 
@@ -186,4 +185,33 @@
 
 .other-login-logo {
     height: 30px;
+}
+
+.profile-footer {
+        position: fixed;
+        left: 0;
+        width: 100%;
+        bottom: 0;
+        z-index: 200;
+    }
+
+@media screen and (max-width: 768px) {
+    .profile-page {
+        padding: 4vh 4vw;
+    }
+
+    .login-signup-box {
+        padding: 2vh 4vw;
+        width: 100%;
+        min-width: unset;
+        min-height: 480px;
+    }
+
+    .login-signup-form {
+        width: 100%;
+    }
+
+    .login-box, .signup-box {
+        margin-top: 30px;
+    }
 }

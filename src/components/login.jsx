@@ -206,7 +206,9 @@ const Login = ({jwt, setJwt}) => {
                 </div>
             )}
             {jwt && <p>{jwt}</p>}
-            <Footer />
+            <div className="profile-footer">
+                <Footer />
+            </div>
         </div>
     )
 }

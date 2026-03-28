@@ -56,16 +56,16 @@ function Header({ setActivePage }) {
 
                 <ul className={`nav ${menuOpen ? "active" : ""}`}>
                     {list.map((item, index) => (
-                        <li key={index}>
-                            <a href="#"
-                               onClick={(e) => {
+                        <li key={index}
+                            onClick={(e) => {
                                    e.preventDefault();
                                    setActivePage(item.title)
                                    setMenuOpen(false);
                                }}
-                            >
+                        >
+                            
                                 {item.title}
-                            </a>
+                            
                         </li>
                     ))}
                 </ul>
