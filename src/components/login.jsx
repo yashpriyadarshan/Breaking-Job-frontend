@@ -5,11 +5,10 @@ import googleLogo from "../assets/google.png"
 import githubLogo from "../assets/github.svg"
 import Footer from "./footer.jsx"
 
-const Login = ({jwt, setJwt}) => {
+const Login = ({jwt, setJwt, profile, setProfile}) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
-    const [profile, setProfile] = useState(null);
     const [isSignup, setIsSignup] = useState(false);
     const [form, setForm] = useState({
         username: "",
@@ -103,6 +102,7 @@ const Login = ({jwt, setJwt}) => {
             if(response.ok) {
                 const data = await response.json();
                 console.log('Profile fetched successfully:', data)
+                console.log('Profile set successfully:', data)
                 setProfile(data)
             } else {
                 setMessage('Failed to fetch profile. Please check your credentials.');
@@ -181,10 +181,10 @@ const Login = ({jwt, setJwt}) => {
                             <div className="forget-bar">
                                 Have an account?
                                 <a href="#"
-                                   onClick={(e) => {
-                                       e.preventDefault();
-                                       setIsSignup(false);
-                                   }}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setIsSignup(false);
+                                    }}
                                 >Login</a>
                             </div>
                         </div>

@@ -11,18 +11,20 @@ import Salary from './components/salary'
 function App() {
     const [activePage, setActivePage] = useState("Home");
     const [jwt, setJwt] = useState('')
+    const [profile, setProfile] = useState(null);
 
   return (
     <div className="App">
-        <Header setActivePage={setActivePage} />
+        <Header setActivePage={setActivePage} profile={profile} />
 
         {activePage === "Home" && <Home />}
+        {/* {activePage === "Employer" && <Company />} */}
         {activePage === "Jobs" && <Job />}
         {activePage === "Company" && <Company />}
         {activePage === "Salary" && <Salary />}
         {activePage === "Community" && <Community />}
         {/*{activePage === "Profile" && <Profile user={user} setUser={setUser} />}*/}
-        {activePage === "Login" && <Login jwt={jwt} setJwt={setJwt}/>}
+        {activePage === "Login" && <Login jwt={jwt} setJwt={setJwt} profile={profile} setProfile={setProfile} />}
     </div>  
   )
 }
