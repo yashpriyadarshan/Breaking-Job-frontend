@@ -6,12 +6,12 @@ import githubLogo from "../assets/github.svg"
 import Footer from "./footer.jsx"
 
 const Login = ({jwt, setJwt, profile, setProfile}) => {
-    const [username, setUsername] = useState('');
+    const [email, setemail] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
     const [isSignup, setIsSignup] = useState(false);
     const [form, setForm] = useState({
-        username: "",
+        email: "",
         password: "",
         role: "USER"
     });
@@ -33,7 +33,7 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        username,
+                        email,
                         password
                     })
                 }
@@ -60,7 +60,7 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
 
         try {
             const params = new URLSearchParams();
-            params.append("username", form.username);
+            params.append("email", form.email);
             params.append("password", form.password);
             params.append("role", 'USER');
 
@@ -76,7 +76,7 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
                 const data = await response.text();
                 // setMessage(data);
 
-                setUsername(form.username);
+                setemail(form.email);
                 setPassword(form.password);
             } else {
                 setMessage("Signup failed");
@@ -135,9 +135,9 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
                                     <div>
                                         <input
                                             type="text"
-                                            value={username}
-                                            placeholder="Username or E-mail"
-                                            onChange={(e) => setUsername(e.target.value)} />
+                                            value={email}
+                                            placeholder="email or E-mail"
+                                            onChange={(e) => setemail(e.target.value)} />
                                     </div>
                                     <div>
                                         <input
@@ -161,9 +161,9 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
                                     <div>
                                         <input
                                             type="text"
-                                            name="username"
-                                            value={form.username}
-                                            placeholder="Username or E-mail"
+                                            name="email"
+                                            value={form.email}
+                                            placeholder="email or E-mail"
                                             onChange={handleChange} />
                                     </div>
                                     <div>
@@ -200,7 +200,7 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
                 ) : (
                 <div>
                     <h3>User Profile</h3>
-                    <p>Name: {profile.username}</p>
+                    <p>Name: {profile.email}</p>
                     <p>Roles: {profile.roles.join(', ')}</p>
                     <p>Message: {profile.message}</p>
                 </div>
