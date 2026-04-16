@@ -59,17 +59,16 @@ const Login = ({jwt, setJwt, profile, setProfile}) => {
         e.preventDefault();
 
         try {
-            const params = new URLSearchParams();
-            params.append("email", form.email);
-            params.append("password", form.password);
-            params.append("role", 'USER');
 
-            const response = await fetch("http://localhost:8080/auth/register", {
+            const response = await fetch("http://localhost:8080/auth/signup", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
+                    "Content-Type": "application/json"
                 },
-                body: params.toString()
+                body: JSON.stringify({
+                    email: form.email,
+                    password: form.password
+                })
             });
 
             if (response.ok) {
