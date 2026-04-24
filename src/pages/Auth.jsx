@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { login, signup } from '../services/authService';
 
 export default function Auth({ role, setRole, activeTab, setActiveTab, setIsAuthenticated }) {
   const [mode, setMode] = useState('Login');
@@ -26,49 +27,17 @@ export default function Auth({ role, setRole, activeTab, setActiveTab, setIsAuth
           throw new Error("Passwords do not match.");
         }
 
-        const payload = {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          password: data.password,
-          role: role === 'FOR CANDIDATE' ? 'CANDIDATE' : 'RECRUITER'
-        };
-
-        const response = await fetch('http://localhost:8080/api/v1/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || 'Registration failed.');
-        }
+        const userRole = role === 'FOR CANDIDATE' ? 'CANDIDATE' : 'RECRUITER';
+        await signup(data.firstName, data.lastName, data.email, data.password, userRole);
 
         alert('Registration successful! Please log in.');
         toggleMode(); // switch to login
 
       } else {
         // LOGIN
-        const payload = {
-          email: data.email,
-          password: data.password
-        };
-
-        const response = await fetch('http://localhost:8080/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || 'Login failed. Check your credentials.');
-        }
+        const result = await login(data.email, data.password);
 
         if (setIsAuthenticated) setIsAuthenticated(true);
-
-        const result = await response.json();
 
         if (result.role === 'RECRUITER' || result.role === 'ROLE_RECRUITER') {
           if (setRole) setRole('FOR RECRUITERS');

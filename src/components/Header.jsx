@@ -1,7 +1,70 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function Header({ role, setRole, activeTab, setActiveTab, isAuthenticated, setIsAuthenticated }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchProfile = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const url = role === 'FOR RECRUITERS' 
+            ? 'http://localhost:8082/api/v1/company' 
+            : 'http://localhost:8081/api/v1/user';
+          const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchProfile();
+    } else {
+      setUser(null);
+    }
+  }, [isAuthenticated, role]);
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      try {
+        const token = localStorage.getItem('token');
+        const url = role === 'FOR RECRUITERS'
+          ? `http://localhost:8082/api/v1/company/${user.id}`
+          : `http://localhost:8081/api/v1/user/${user.id}`;
+        
+        const res = await fetch(url, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok || res.status === 204) {
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
+          setActiveTab(null);
+          setIsDropdownOpen(false);
+        } else {
+          alert('Failed to delete account');
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+  };
 
   const handleRoleSwitch = (newRole) => {
     setRole(newRole);
@@ -84,41 +147,110 @@ export default function Header({ role, setRole, activeTab, setActiveTab, isAuthe
       </div>
 
       {/* DESKTOP AUTH */}
-      <div className="hidden lg:flex items-center h-full gap-4">
+      <div className="hidden lg:flex items-center h-full gap-4 relative" ref={dropdownRef}>
         {isAuthenticated ? (
           <>
             <button
-              onClick={() => setActiveTab('Profile')}
-              className={`text-sm font-medium transition-colors ${activeTab === 'Profile' ? 'text-[#ffa116]' : 'text-gray-400 hover:text-white'}`}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-8 h-8 rounded-full bg-[#333] border border-[#444] shadow-sm flex items-center justify-center overflow-hidden hover:border-[#ffa116] transition-colors focus:outline-none"
             >
-              Profile
+              {(role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture) ? (
+                <img src={role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-bold text-[#ffa116]">
+                  {role === 'FOR RECRUITERS' ? (user?.name?.charAt(0) || 'R') : (user?.firstName?.charAt(0) || 'U')}
+                </span>
+              )}
             </button>
-            <button
-              onClick={() => {
-                localStorage.removeItem('token');
-                setIsAuthenticated(false);
-                setActiveTab(null);
-              }}
-              className="text-sm font-medium bg-[#333] hover:bg-[#444] text-white px-4 py-1.5 rounded-full transition-colors border border-[#444]"
-            >
-              Logout
-            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute top-[48px] right-0 w-[280px] bg-[#282828] border border-[#333] rounded-xl shadow-2xl py-2 flex flex-col z-50">
+                <button 
+                  onClick={() => { setIsDropdownOpen(false); setActiveTab('Profile'); }}
+                  className="w-full px-4 py-3 border-b border-[#333] flex items-center gap-3 hover:bg-[#333]/50 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 rounded-full bg-[#333] flex items-center justify-center overflow-hidden shrink-0">
+                    {(role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture) ? (
+                      <img src={role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl font-bold text-[#ffa116]">
+                        {role === 'FOR RECRUITERS' ? (user?.name?.charAt(0) || 'R') : (user?.firstName?.charAt(0) || 'U')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-base font-bold text-white truncate">
+                      {role === 'FOR RECRUITERS' ? user?.name : `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
+                    </span>
+                    {role === 'FOR CANDIDATE' && (
+                      <span className="text-[11px] font-medium text-[#ffa116] truncate mt-0.5">Access all features!</span>
+                    )}
+                  </div>
+                </button>
+
+                <div className="py-2 flex flex-col border-b border-[#333]">
+                  {role === 'FOR CANDIDATE' ? (
+                    <>
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { setIsDropdownOpen(false); setActiveTab('Interviews'); }}>
+                        <div className="w-6 h-6 rounded bg-green-500/20 flex items-center justify-center"><svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                        Get Verified (AI Interview)
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { setIsDropdownOpen(false); setActiveTab('Jobs'); }}>
+                        <div className="w-6 h-6 rounded bg-blue-500/20 flex items-center justify-center"><svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg></div>
+                        Applied Jobs
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { setIsDropdownOpen(false); setActiveTab('Companies'); }}>
+                        <div className="w-6 h-6 rounded bg-purple-500/20 flex items-center justify-center"><svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg></div>
+                        Applied Companies
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { setIsDropdownOpen(false); setActiveTab('Overview'); }}>
+                        <div className="w-6 h-6 rounded bg-[#ffa116]/20 flex items-center justify-center"><svg className="w-4 h-4 text-[#ffa116]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></div>
+                        Add New Job Post
+                      </button>
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { setIsDropdownOpen(false); setActiveTab('Candidates'); }}>
+                        <div className="w-6 h-6 rounded bg-blue-500/20 flex items-center justify-center"><svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
+                        View Applicants
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="py-2 flex flex-col">
+                  <button className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { setIsDropdownOpen(false); setActiveTab('Profile'); }}>
+                    <div className="w-5 h-5 flex items-center justify-center"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></div>
+                    Edit Profile
+                  </button>
+                  <button className="flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-[#333] hover:text-red-300 transition-colors text-left w-full" onClick={handleDeleteAccount}>
+                    <div className="w-5 h-5 flex items-center justify-center"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div>
+                    Delete Account
+                  </button>
+                  <button className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors text-left w-full" onClick={() => { localStorage.removeItem('token'); setIsAuthenticated(false); setActiveTab(null); setIsDropdownOpen(false); }}>
+                    <div className="w-5 h-5 flex items-center justify-center"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></div>
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
-          <>
-            <button
-              onClick={() => setActiveTab('Login')}
-              className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
-            >
-              Sign in
-            </button>
+          <div className="flex items-center text-[15px] font-medium text-gray-300">
             <button
               onClick={() => setActiveTab('Signup')}
-              className="text-sm font-medium bg-[#ffa116]/10 text-[#ffa116] hover:bg-[#ffa116]/20 px-4 py-1.5 rounded-full transition-colors border border-[#ffa116]/30"
+              className="hover:text-white transition-colors"
             >
               Register
             </button>
-          </>
+            <span className="mx-2 text-gray-500 font-normal">or</span>
+            <button
+              onClick={() => setActiveTab('Login')}
+              className="hover:text-white transition-colors"
+            >
+              Log in
+            </button>
+          </div>
         )}
       </div>
 
