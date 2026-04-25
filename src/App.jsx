@@ -7,6 +7,7 @@ import Community from './pages/Community'
 import RecruiterHome from './pages/RecruiterHome'
 import Auth from './pages/Auth'
 import Profile from './pages/Profile'
+import Settings from './pages/Settings'
 
 function App() {
   const [role, setRole] = useState(() => localStorage.getItem('role') || 'FOR CANDIDATE');
@@ -32,7 +33,11 @@ function App() {
     }
     
     if (activeTab === 'Profile') {
-      return <Profile role={role} />;
+      return <Profile role={role} setActiveTab={setActiveTab} />;
+    }
+    
+    if (activeTab === 'Settings') {
+      return <Settings role={role} setIsAuthenticated={setIsAuthenticated} setActiveTab={setActiveTab} />;
     }
 
     if (activeTab === 'Community') {

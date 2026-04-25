@@ -32,7 +32,10 @@ export const updateUserProfile = async (id, userData) => {
     },
     body: JSON.stringify(userData),
   });
-  if (!response.ok) throw new Error('Failed to update user profile');
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update user profile: ${errorText}`);
+  }
   return response.json();
 };
 
