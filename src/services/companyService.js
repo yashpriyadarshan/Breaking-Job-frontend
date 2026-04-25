@@ -57,7 +57,8 @@ export const updateCompany = async (companyData) => {
     body: JSON.stringify(companyData),
   });
   if (!response.ok) {
-    throw new Error('Failed to update company');
+    const errorText = await response.text();
+    throw new Error(`Failed to update company: ${errorText}`);
   }
   return response.json();
 };
@@ -72,7 +73,6 @@ export const deleteCompany = async (id) => {
   if (!response.ok) {
     throw new Error('Failed to delete company');
   }
-  return response.json();
 };
 
 export const uploadLogo = async (id, file) => {

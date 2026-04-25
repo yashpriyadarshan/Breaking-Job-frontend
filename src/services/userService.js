@@ -45,18 +45,14 @@ export const getUserById = async (id) => {
     headers: { ...getAuthHeaders() },
   });
   if (!response.ok) throw new Error('Failed to fetch user');
-  console.log(response);
   return response.json();
 };
 
 export const getUserProfile = async () => {
-  console.log("getting user profile");
   const response = await fetch(API_URL, {
     method: 'GET',
     headers: { ...getAuthHeaders() },
   });
-  console.log(response)
-  console.log("user profile respinse" + response);
   if (!response.ok) throw new Error('Failed to fetch user profile');
   return response.json();
 };
@@ -92,6 +88,7 @@ export const deleteSkill = async (id, skillId) => {
     headers: { ...getAuthHeaders() },
   });
   if (!response.ok) throw new Error('Failed to delete skill');
+  // DELETE returns no body
 };
 
 // --- Experience Endpoints ---
@@ -116,6 +113,7 @@ export const deleteExperience = async (id, experienceId) => {
     headers: { ...getAuthHeaders() },
   });
   if (!response.ok) throw new Error('Failed to delete experience');
+  // DELETE returns no body
 };
 
 // --- Project Endpoints ---
@@ -140,6 +138,7 @@ export const deleteProject = async (id, projectId) => {
     headers: { ...getAuthHeaders() },
   });
   if (!response.ok) throw new Error('Failed to delete project');
+  // DELETE returns no body
 };
 
 // --- File Uploads ---
