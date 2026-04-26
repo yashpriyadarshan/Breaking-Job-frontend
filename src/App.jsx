@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Header from './components/Header'
 import CandidateHome from './pages/CandidateHome'
 import CandidateJobs from './pages/CandidateJobs'
@@ -12,11 +12,14 @@ import RecruiterAuth from './pages/RecruiterAuth'
 import CreateJob from './pages/CreateJob'
 import Candidates from './pages/Candidates'
 import Interviews from './pages/Interviews'
+import { getCompany } from './services/companyService'
+import { getUserProfile } from './services/userService'
 
 function App() {
   const [role, setRole] = useState(() => localStorage.getItem('role') || 'FOR CANDIDATE');
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('activeTab') || null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('role', role);
@@ -30,6 +33,40 @@ function App() {
     }
   }, [activeTab]);
 
+  // Stable fetch function using useCallback so event listeners always get the latest version
+  const fetchUser = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const data = role === 'FOR RECRUITERS' ? await getCompany() : await getUserProfile();
+      setUser(data);
+    } catch (e) {
+      console.error('App: Failed to fetch user', e);
+    }
+  }, [isAuthenticated, role]);
+
+  // Fetch user on auth/role change
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUser();
+    } else {
+      setUser(null);
+    }
+  }, [fetchUser, isAuthenticated]);
+
+  // Listen for profile updates from child components
+  useEffect(() => {
+    const handleUpdate = (e) => {
+      if (e.detail) {
+        setUser(e.detail);
+      }
+    };
+    window.addEventListener('profileUpdated', handleUpdate);
+    return () => window.removeEventListener('profileUpdated', handleUpdate);
+  }, []);
+
+  // Convenience: refetch user from server (used after logo/picture upload where
+  // the upload response may not contain the full public URL)
+  const refetchUser = useCallback(() => fetchUser(), [fetchUser]);
 
   const renderContent = () => {
     if (activeTab === 'Login' || activeTab === 'Signup') {
@@ -41,11 +78,11 @@ function App() {
     }
     
     if (activeTab === 'Profile') {
-      return <Profile role={role} setActiveTab={setActiveTab} />;
+      return <Profile role={role} user={user} setUser={setUser} setActiveTab={setActiveTab} />;
     }
     
     if (activeTab === 'Settings') {
-      return <Settings role={role} setIsAuthenticated={setIsAuthenticated} setActiveTab={setActiveTab} />;
+      return <Settings role={role} user={user} setUser={setUser} refetchUser={refetchUser} setIsAuthenticated={setIsAuthenticated} setActiveTab={setActiveTab} />;
     }
 
     if (activeTab === 'Community') {
@@ -74,6 +111,7 @@ function App() {
         setActiveTab={setActiveTab} 
         isAuthenticated={isAuthenticated}
         setIsAuthenticated={setIsAuthenticated}
+        user={user}
       />
       {renderContent()}
     </div>

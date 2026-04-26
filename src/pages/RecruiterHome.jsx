@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getCompanyJobs, createJob, deleteJob, updateJobStatus } from '../services/jobService';
 
 export default function RecruiterHome({ setActiveTab }) {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('All');
 
-  const metrics = [
-    { label: "Active Openings", value: "12", trend: "+2", color: "text-[#ffa116]", bg: "bg-[#ffa116]/10" },
-    { label: "Total Candidates", value: "486", trend: "+24%", color: "text-[#2cbb5d]", bg: "bg-[#2cbb5d]/10" },
-    { label: "Interviews", value: "28", trend: "8 today", color: "text-blue-400", bg: "bg-blue-400/10" },
-    { label: "Avg. Time to Hire", value: "18d", trend: "-2d", color: "text-purple-400", bg: "bg-purple-400/10" }
-  ];
+  const fetchJobs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getCompanyJobs(page, 10);
+      setJobs(data.content || []);
+      setTotalPages(data.totalPages || 0);
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
+  }, [page]);
 
-  const activeJobs = [
-    { title: "Senior Frontend Engineer", dept: "Engineering", applicants: 142, status: "Active", matchRate: "94%" },
-    { title: "Lead Product Designer", dept: "Design", applicants: 89, status: "Interviewing", matchRate: "88%" },
-    { title: "Backend Systems Staff", dept: "Engineering", applicants: 210, status: "Active", matchRate: "91%" },
-    { title: "Product Manager", dept: "Product", applicants: 56, status: "On Hold", matchRate: "85%" }
+  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+
+  const openJobsCount = jobs.filter(j => j.status === 'OPEN').length;
+  const totalApplicants = jobs.reduce((sum, j) => sum + (j.applicationCount || 0), 0);
+  const totalViews = jobs.reduce((sum, j) => sum + (j.viewCount || 0), 0);
+
+  const metrics = [
+    { label: "Active Openings", value: openJobsCount, trend: `+${jobs.length} total`, color: "text-[#ffa116]", bg: "bg-[#ffa116]/10" },
+    { label: "Total Applicants", value: totalApplicants, trend: "+24%", color: "text-[#2cbb5d]", bg: "bg-[#2cbb5d]/10" },
+    { label: "Total Views", value: totalViews, trend: "All time", color: "text-blue-400", bg: "bg-blue-400/10" },
+    { label: "Avg. Time to Hire", value: "18d", trend: "-2d", color: "text-purple-400", bg: "bg-purple-400/10" }
   ];
 
   const recentActivities = [
@@ -54,6 +72,8 @@ export default function RecruiterHome({ setActiveTab }) {
           </div>
         </header>
 
+        {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">{error}</div>}
+
         {/* METRICS GRID */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {metrics.map((metric, i) => (
@@ -67,13 +87,6 @@ export default function RecruiterHome({ setActiveTab }) {
               <div className="text-4xl font-black text-white mb-2">{metric.value}</div>
               <div className="w-full h-1 bg-[#333] rounded-full mt-4 overflow-hidden">
                 <div className={`h-full ${metric.color.replace('text', 'bg')} w-2/3 rounded-full opacity-50`}></div>
-              </div>
-              
-              {/* Decorative Sparkline (Simple SVG) */}
-              <div className="absolute bottom-0 left-0 w-full opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-                <svg viewBox="0 0 100 20" className="w-full h-12">
-                   <path d="M0,20 Q10,5 20,15 T40,10 T60,18 T80,8 T100,15 L100,20 L0,20 Z" fill="currentColor" className={metric.color} />
-                </svg>
               </div>
             </div>
           ))}
@@ -128,51 +141,57 @@ export default function RecruiterHome({ setActiveTab }) {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-[#222] text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                      <th className="px-6 py-4">Job Title</th>
-                      <th className="px-6 py-4">Department</th>
-                      <th className="px-6 py-4">Applicants</th>
-                      <th className="px-6 py-4">Match Rate</th>
-                      <th className="px-6 py-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#333]">
-                    {activeJobs.map((job, i) => (
-                      <tr key={i} className="hover:bg-[#333]/30 transition-colors cursor-pointer group">
-                        <td className="px-6 py-5">
-                          <div className="font-bold text-gray-200 group-hover:text-white">{job.title}</div>
-                        </td>
-                        <td className="px-6 py-5 text-sm text-gray-400">{job.dept}</td>
-                        <td className="px-6 py-5">
-                           <div className="flex items-center gap-2">
-                             <span className="font-bold text-white">{job.applicants}</span>
-                             <div className="w-12 h-1.5 bg-[#333] rounded-full overflow-hidden">
-                                <div className="h-full bg-[#ffa116] w-3/4"></div>
-                             </div>
-                           </div>
-                        </td>
-                        <td className="px-6 py-5">
-                           <span className="text-[#2cbb5d] font-bold text-sm">{job.matchRate}</span>
-                        </td>
-                        <td className="px-6 py-5">
-                           <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${
-                             job.status === 'Active' ? 'border-[#2cbb5d]/30 text-[#2cbb5d] bg-[#2cbb5d]/5' : 
-                             job.status === 'Interviewing' ? 'border-blue-500/30 text-blue-400 bg-blue-500/5' : 
-                             'border-gray-500/30 text-gray-400 bg-gray-500/5'
-                           }`}>
-                             {job.status}
-                           </span>
-                        </td>
+                {loading ? (
+                  <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-4 border-[#ffa116] border-t-transparent rounded-full animate-spin"></div></div>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-[#222] text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                        <th className="px-6 py-4">Job Title</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Applicants</th>
+                        <th className="px-6 py-4">Views</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#333]">
+                      {jobs.map((job) => (
+                        <tr key={job.id} className="hover:bg-[#333]/30 transition-colors cursor-pointer group">
+                          <td className="px-6 py-5">
+                            <div className="font-bold text-gray-200 group-hover:text-white">{job.title}</div>
+                            <div className="text-[10px] text-gray-500 mt-1">{job.location}</div>
+                          </td>
+                          <td className="px-6 py-5">
+                             <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${
+                               job.status === 'OPEN' ? 'border-[#2cbb5d]/30 text-[#2cbb5d] bg-[#2cbb5d]/5' : 
+                               'border-gray-500/30 text-gray-400 bg-gray-500/5'
+                             }`}>
+                               {job.status}
+                             </span>
+                          </td>
+                          <td className="px-6 py-5">
+                             <div className="font-bold text-white">{job.applicationCount || 0}</div>
+                          </td>
+                          <td className="px-6 py-5">
+                             <div className="font-bold text-gray-400">{job.viewCount || 0}</div>
+                          </td>
+                        </tr>
+                      ))}
+                      {jobs.length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="px-6 py-10 text-center text-gray-500 text-sm">No job postings found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
               </div>
-              <div className="p-4 bg-[#222] text-center">
-                <button className="text-xs font-bold text-[#ffa116] hover:underline uppercase tracking-widest">View All 12 Postings</button>
-              </div>
+              {totalPages > 1 && (
+                <div className="p-4 bg-[#222] flex justify-center items-center gap-3">
+                  <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1 bg-[#282828] border border-[#333] rounded text-xs text-gray-400 hover:bg-[#333] disabled:opacity-40 transition-all">Prev</button>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase">Page {page + 1} of {totalPages}</span>
+                  <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1 bg-[#282828] border border-[#333] rounded text-xs text-gray-400 hover:bg-[#333] disabled:opacity-40 transition-all">Next</button>
+                </div>
+              )}
             </section>
           </div>
 
@@ -224,7 +243,7 @@ export default function RecruiterHome({ setActiveTab }) {
                     </div>
                   ))}
                </div>
-               <button className="w-full mt-6 bg-white text-black py-3 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all">
+               <button className="w-full mt-6 bg-white text-black py-3 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all" onClick={() => setActiveTab('Candidates')}>
                   View Recommended Talent
                </button>
             </section>

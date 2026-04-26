@@ -9,41 +9,44 @@ import {
   uploadProfilePicture
 } from '../services/userService';
 
-export default function Profile({ role, setActiveTab }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function Profile({ role, setActiveTab, user, setUser }) {
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(!user);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('Experience');
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('Not authenticated');
+    if (!user) {
+      const fetchProfile = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) throw new Error('Not authenticated');
 
-        const url = role === 'FOR RECRUITERS'
-          ? 'http://localhost:8082/api/v1/company'
-          : 'http://localhost:8081/api/v1/user';
+          const url = role === 'FOR RECRUITERS'
+            ? 'http://localhost:8082/api/v1/company'
+            : 'http://localhost:8081/api/v1/user';
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
 
-        if (!response.ok) throw new Error('Failed to fetch profile details');
-        const data = await response.json();
-        setUser(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [role]);
+          if (!response.ok) throw new Error('Failed to fetch profile details');
+          const data = await response.json();
+          setUser(data);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [role, user, setUser]);
 
   const handleInputChange = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -57,11 +60,11 @@ export default function Profile({ role, setActiveTab }) {
         setUser(updated);
       } else {
         const payload = {
-          FirstName: formData.FirstName || formData.firstName || '',
-          LastName: formData.LastName || formData.lastName || '',
-          bio: formData.bio || '',
-          location: formData.location || '',
-          phone: formData.phone || '',
+          FirstName: formData.FirstName || formData.firstName || user?.firstName || '',
+          LastName: formData.LastName || formData.lastName || user?.lastName || '',
+          bio: formData.bio || user?.bio || '',
+          location: formData.location || user?.location || '',
+          phone: formData.phone || user?.phone || '',
         };
         const updated = await updateUserProfile(user.id, payload);
         setUser(updated);
@@ -235,7 +238,7 @@ export default function Profile({ role, setActiveTab }) {
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                 </div>
                 <div className="flex-grow min-w-0">
-                   <div className="text-[11px] font-black text-white truncate">{user?.firstName}_Resume.pdf</div>
+                   <div className="text-[11px] font-black text-white truncate">{user?.firstName || user?.name}_Resume.pdf</div>
                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-0.5">Updated 2d ago</div>
                 </div>
              </div>

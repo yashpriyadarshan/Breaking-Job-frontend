@@ -28,6 +28,4 @@ export const signup = async (firstName, lastName, email, password, role) => {
     const errData = await response.json().catch(() => ({}));
     throw new Error(errData.message || 'Registration failed.');
   }
-
-  // No specific JSON return needed for signup based on current implementation
 };

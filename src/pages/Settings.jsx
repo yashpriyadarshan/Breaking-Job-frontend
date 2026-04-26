@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  getUserProfile, 
-  updateUserProfile, 
-  uploadResume, 
-  uploadProfilePicture,
-  addSkill, deleteSkill,
-  addExperience, deleteExperience,
-  addProject, deleteProject
-} from '../services/userService';
+import { updateUserProfile, uploadResume, uploadProfilePicture, addSkill, deleteSkill, addExperience, deleteExperience, addProject, deleteProject } from '../services/userService';
 import { updateCompany, uploadLogo } from '../services/companyService';
+import { deleteUserProfile } from '../services/userService';
+import { deleteCompany } from '../services/companyService';
 
-export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function Settings({ role, setIsAuthenticated, setActiveTab, user, setUser, refetchUser }) {
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState('Account');
   const [formData, setFormData] = useState({});
@@ -20,35 +12,27 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  const fetchProfile = async () => {
-    try {
-      const data = await getUserProfile();
-      setUser(data);
-      const baseData = {
-        FirstName: data.firstName || data.FirstName || '',
-        LastName: data.lastName || data.LastName || '',
-        bio: data.bio || '',
-        location: data.location || '',
-        phone: data.phone || '',
-        profilePicture: data.profilePicture || '',
-        resumeUrl: data.resumeUrl || '',
-        name: data.name || '',
-        address: data.address || '',
-        description: data.description || '',
-        website: data.website || ''
-      };
-      setFormData(baseData);
-      setInitialData(baseData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Sync form data when user prop changes
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (user) {
+      const base = {
+        FirstName: user.firstName || user.FirstName || '',
+        LastName: user.lastName || user.LastName || '',
+        bio: user.bio || '', location: user.location || '',
+        phone: user.phone || '', profilePicture: user.profilePicture || '',
+        resumeUrl: user.resumeUrl || '', name: user.name || '',
+        address: user.address || '', description: user.description || '',
+        website: user.website || ''
+      };
+      setFormData(base);
+      setInitialData(base);
+    }
+  }, [user]);
+
+  const broadcastUpdate = (data) => {
+    setUser(data);
+    window.dispatchEvent(new CustomEvent('profileUpdated', { detail: data }));
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -56,15 +40,11 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setSuccessMsg('');
-    setError(null);
+    setSaving(true); setSuccessMsg(''); setError(null);
     try {
       const changedData = {};
-      
       const accountFields = role === 'FOR RECRUITERS' ? ['name', 'phone'] : ['FirstName', 'LastName', 'phone'];
       const profileFields = role === 'FOR RECRUITERS' ? ['description', 'website', 'address', 'location'] : ['bio', 'location'];
-      
       const relevantFields = activeSection === 'Account' ? accountFields : (activeSection === 'Profile Settings' ? profileFields : []);
 
       relevantFields.forEach(key => {
@@ -74,33 +54,25 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
       });
 
       if (Object.keys(changedData).length === 0) {
-        setSuccessMsg('No changes detected in this section.');
-        setSaving(false);
-        return;
+        setSuccessMsg('No changes detected.'); setSaving(false); return;
       }
 
+      let updated;
       if (role === 'FOR RECRUITERS') {
-        await updateCompany(changedData);
+        updated = await updateCompany({ ...changedData, id: user.id });
       } else {
-        await updateUserProfile(user.id, changedData);
+        updated = await updateUserProfile(user.id, changedData);
       }
-      
-      await fetchProfile(); // Always fetch fresh data via GET
+      broadcastUpdate(updated);
       setSuccessMsg('Settings updated successfully!');
-      window.dispatchEvent(new Event('profileUpdated'));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
   };
 
   const handleFileUpload = async (type, e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setSaving(true);
-    setSuccessMsg('');
-    setError(null);
+    setSaving(true); setSuccessMsg(''); setError(null);
     try {
       if (type === 'avatar') {
         if (role === 'FOR RECRUITERS') {
@@ -111,26 +83,21 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
       } else if (type === 'resume') {
         await uploadResume(user.id, file);
       }
-      await fetchProfile(); // Always fetch fresh data via GET
+      // Re-fetch to get the public URL the backend generates
+      await refetchUser();
       setSuccessMsg(`${type === 'avatar' ? 'Picture' : 'Resume'} uploaded successfully!`);
-      window.dispatchEvent(new Event('profileUpdated'));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
   };
 
+  // --- Skill/Experience/Project handlers (candidate only) ---
   const handleAddSkill = async (e) => {
     e.preventDefault();
     const name = e.target.skillName.value;
     if (!name) return;
     setSaving(true);
-    try {
-      await addSkill(user.id, { name });
-      await fetchProfile();
-      e.target.reset();
-    } catch (err) { setError(err.message); }
+    try { const updated = await addSkill(user.id, { name }); broadcastUpdate(updated); e.target.reset(); }
+    catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -138,26 +105,17 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
     setSaving(true);
     try {
       await deleteSkill(user.id, skillId);
-      await fetchProfile();
+      setUser(prev => ({ ...prev, skills: prev.skills.filter(s => s.id !== skillId) }));
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
 
   const handleAddExperience = async (e) => {
     e.preventDefault();
-    const data = {
-      company: e.target.company.value,
-      role: e.target.role.value,
-      description: e.target.description.value,
-      startDate: e.target.startDate.value,
-      endDate: e.target.endDate.value,
-    };
+    const data = { company: e.target.company.value, role: e.target.role.value, description: e.target.description.value, startDate: e.target.startDate.value, endDate: e.target.endDate.value };
     setSaving(true);
-    try {
-      await addExperience(user.id, data);
-      await fetchProfile();
-      e.target.reset();
-    } catch (err) { setError(err.message); }
+    try { const updated = await addExperience(user.id, data); broadcastUpdate(updated); e.target.reset(); }
+    catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -165,25 +123,17 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
     setSaving(true);
     try {
       await deleteExperience(user.id, expId);
-      await fetchProfile();
+      setUser(prev => ({ ...prev, experiences: prev.experiences.filter(x => x.id !== expId) }));
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
 
   const handleAddProject = async (e) => {
     e.preventDefault();
-    const data = {
-      title: e.target.title.value,
-      description: e.target.description.value,
-      githubLink: e.target.githubLink.value,
-      liveLink: e.target.liveLink.value,
-    };
+    const data = { title: e.target.title.value, description: e.target.description.value, githubLink: e.target.githubLink.value, liveLink: e.target.liveLink.value };
     setSaving(true);
-    try {
-      await addProject(user.id, data);
-      await fetchProfile();
-      e.target.reset();
-    } catch (err) { setError(err.message); }
+    try { const updated = await addProject(user.id, data); broadcastUpdate(updated); e.target.reset(); }
+    catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -191,7 +141,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
     setSaving(true);
     try {
       await deleteProject(user.id, projId);
-      await fetchProfile();
+      setUser(prev => ({ ...prev, projects: prev.projects.filter(x => x.id !== projId) }));
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
@@ -199,30 +149,19 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
   const handleDeleteAccount = async () => {
     if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       try {
-        const token = localStorage.getItem('token');
-        const url = role === 'FOR RECRUITERS'
-          ? `http://localhost:8082/api/v1/company/${user.id}`
-          : `http://localhost:8081/api/v1/user/${user.id}`;
-        
-        const res = await fetch(url, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (res.ok || res.status === 204) {
-          localStorage.removeItem('token');
-          setIsAuthenticated(false);
-          setActiveTab(null);
-        } else {
-          alert('Failed to delete account');
-        }
-      } catch (e) {
-        alert(e.message);
-      }
+        if (role === 'FOR RECRUITERS') { await deleteCompany(user.id); }
+        else { await deleteUserProfile(user.id); }
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        setActiveTab(null);
+      } catch (e) { alert(e.message); }
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-400">Loading settings...</div>;
+  if (!user) return <div className="p-8 text-center text-gray-400">Loading settings...</div>;
+
+  const avatarUrl = role === 'FOR RECRUITERS' ? user.logoUrl : user.profilePicture;
+  const fallbackInitial = role === 'FOR RECRUITERS' ? (user.name?.charAt(0) || 'R') : (user.firstName?.charAt(0) || 'U');
 
   const sidebarItems = [
     { name: 'Account', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
@@ -236,14 +175,9 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
       <div className="w-64 border-r border-[#333] flex flex-col p-4 gap-2 shrink-0 sticky top-14 h-[calc(100vh-56px)]">
         <h2 className="text-xl font-bold px-4 mb-6">Settings</h2>
         {sidebarItems.map(item => (
-          <button
-            key={item.name}
-            onClick={() => { setActiveSection(item.name); setSuccessMsg(''); setError(null); }}
-            className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${activeSection === item.name ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#282828] hover:text-white'}`}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-            </svg>
+          <button key={item.name} onClick={() => { setActiveSection(item.name); setSuccessMsg(''); setError(null); }}
+            className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${activeSection === item.name ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#282828] hover:text-white'}`}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} /></svg>
             {item.name}
           </button>
         ))}
@@ -280,11 +214,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
                   {error && activeSection === 'Account' && <p className="text-red-400 text-sm mb-2">{error}</p>}
                   {successMsg && activeSection === 'Account' && <p className="text-green-400 text-sm mb-2">{successMsg}</p>}
                 </div>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-6 py-2 bg-[#ffa116] text-[#1a1a1a] font-bold rounded-lg hover:bg-[#ffb03a] transition-colors disabled:opacity-50"
-                >
+                <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-[#ffa116] text-[#1a1a1a] font-bold rounded-lg hover:bg-[#ffb03a] transition-colors disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save Account Changes'}
                 </button>
               </div>
@@ -292,13 +222,8 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
               <section className="mt-12 pt-8 border-t border-[#333]">
                 <h3 className="text-lg font-bold text-red-500 mb-2">Danger Zone</h3>
                 <p className="text-sm text-gray-400 mb-4">Once you delete your account, there is no going back. Please be certain.</p>
-                <button
-                  onClick={handleDeleteAccount}
-                  className="flex items-center gap-2 px-4 py-2 border border-red-500/50 text-red-500 rounded-lg hover:bg-red-500/10 transition-colors text-sm font-bold"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                <button onClick={handleDeleteAccount} className="flex items-center gap-2 px-4 py-2 border border-red-500/50 text-red-500 rounded-lg hover:bg-red-500/10 transition-colors text-sm font-bold">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   Delete Account
                 </button>
               </section>
@@ -312,8 +237,12 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   {/* Avatar Card */}
                   <div className="bg-[#282828] border border-[#333] rounded-xl p-6 flex flex-col items-center gap-4">
-                    <div className="w-24 h-24 rounded-2xl bg-[#1a1a1a] border-2 border-[#333] overflow-hidden relative group">
-                      <img src={role === 'FOR RECRUITERS' ? (user.logoUrl || user.logo) : user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                    <div className="w-24 h-24 rounded-2xl bg-[#1a1a1a] border-2 border-[#333] overflow-hidden relative group flex items-center justify-center">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl font-bold text-[#ffa116]">{fallbackInitial}</span>
+                      )}
                       <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-white">Change</span>
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload('avatar', e)} />
@@ -350,16 +279,10 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
                     </>
                   )}
                   <SettingItem label="Current Location" name="location" value={formData.location} onChange={handleInputChange} />
-                  
                   <div className="px-6 py-4 flex flex-col gap-2">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{role === 'FOR RECRUITERS' ? 'About the Company' : 'Professional Bio'}</label>
-                    <textarea
-                      name={role === 'FOR RECRUITERS' ? 'description' : 'bio'}
-                      value={role === 'FOR RECRUITERS' ? formData.description : formData.bio}
-                      onChange={handleInputChange}
-                      className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-sm focus:outline-none focus:border-[#ffa116] min-h-[120px]"
-                      placeholder="Share your story..."
-                    />
+                    <textarea name={role === 'FOR RECRUITERS' ? 'description' : 'bio'} value={role === 'FOR RECRUITERS' ? formData.description : formData.bio} onChange={handleInputChange}
+                      className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-sm focus:outline-none focus:border-[#ffa116] min-h-[120px]" placeholder="Share your story..." />
                   </div>
                 </div>
 
@@ -368,11 +291,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
                     {error && activeSection === 'Profile Settings' && <p className="text-red-400 text-sm mb-2">{error}</p>}
                     {successMsg && activeSection === 'Profile Settings' && <p className="text-green-400 text-sm mb-2">{successMsg}</p>}
                   </div>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="px-6 py-2 bg-[#ffa116] text-[#1a1a1a] font-bold rounded-lg hover:bg-[#ffb03a] transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-[#ffa116] text-[#1a1a1a] font-bold rounded-lg hover:bg-[#ffb03a] transition-colors disabled:opacity-50">
                     {saving ? 'Saving...' : 'Save Profile Changes'}
                   </button>
                 </div>
@@ -380,7 +299,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
 
               {role === 'FOR CANDIDATE' && (
                 <>
-                  {/* Skills Section */}
+                  {/* Skills */}
                   <section>
                     <h3 className="text-lg font-bold mb-4">Skills</h3>
                     <div className="bg-[#282828] border border-[#333] rounded-xl p-6">
@@ -400,7 +319,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
                     </div>
                   </section>
 
-                  {/* Experience Section */}
+                  {/* Experience */}
                   <section>
                     <h3 className="text-lg font-bold mb-4">Experience</h3>
                     <div className="flex flex-col gap-4 mb-6">
@@ -426,7 +345,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
                     </form>
                   </section>
 
-                  {/* Projects Section */}
+                  {/* Projects */}
                   <section>
                     <h3 className="text-lg font-bold mb-4">Projects</h3>
                     <div className="flex flex-col gap-4 mb-6">
@@ -460,9 +379,7 @@ export default function Settings({ role, setIsAuthenticated, setActiveTab }) {
 
           {(activeSection !== 'Account' && activeSection !== 'Profile Settings') && (
             <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-              <svg className="w-16 h-16 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+              <svg className="w-16 h-16 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
               <h3 className="text-lg font-bold text-white">Privacy & Security</h3>
               <p className="text-sm mt-1">This section is coming soon.</p>
             </div>
@@ -479,17 +396,9 @@ function SettingItem({ label, name, value, onChange }) {
     <div className="px-6 py-4 flex items-center justify-between group hover:bg-[#333]/30 transition-colors">
       <div className="flex flex-col gap-1 flex-1">
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</label>
-        <input
-          name={name}
-          value={value}
-          onChange={onChange}
-          className="bg-transparent border-none p-0 text-sm text-gray-200 focus:outline-none focus:ring-0 w-full"
-          placeholder={`Enter ${label.toLowerCase()}...`}
-        />
+        <input name={name} value={value} onChange={onChange} className="bg-transparent border-none p-0 text-sm text-gray-200 focus:outline-none focus:ring-0 w-full" placeholder={`Enter ${label.toLowerCase()}...`} />
       </div>
-      <svg className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-      </svg>
+      <svg className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
     </div>
   );
 }

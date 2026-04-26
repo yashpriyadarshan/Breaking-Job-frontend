@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { deleteUserProfile } from '../services/userService';
+import { deleteCompany } from '../services/companyService';
 
-export default function Header({ role, setRole, activeTab, setActiveTab, isAuthenticated, setIsAuthenticated }) {
+export default function Header({ role, setRole, activeTab, setActiveTab, isAuthenticated, setIsAuthenticated, user }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [user, setUser] = useState(null);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -16,29 +17,6 @@ export default function Header({ role, setRole, activeTab, setActiveTab, isAuthe
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      const fetchProfile = async () => {
-        try {
-          const token = localStorage.getItem('token');
-          const url = role === 'FOR RECRUITERS' 
-            ? 'http://localhost:8082/api/v1/company' 
-            : 'http://localhost:8081/api/v1/user';
-          const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-          if (res.ok) {
-            const data = await res.json();
-            setUser(data);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      };
-      fetchProfile();
-    } else {
-      setUser(null);
-    }
-  }, [isAuthenticated, role]);
-
   const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
@@ -49,24 +27,15 @@ export default function Header({ role, setRole, activeTab, setActiveTab, isAuthe
   const handleDeleteAccount = async () => {
     if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       try {
-        const token = localStorage.getItem('token');
-        const url = role === 'FOR RECRUITERS'
-          ? `http://localhost:8082/api/v1/company/${user.id}`
-          : `http://localhost:8081/api/v1/user/${user.id}`;
-        
-        const res = await fetch(url, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (res.ok || res.status === 204) {
-          localStorage.removeItem('token');
-          setIsAuthenticated(false);
-          setActiveTab(null);
-          setIsDropdownOpen(false);
+        if (role === 'FOR RECRUITERS') {
+          await deleteCompany(user.id);
         } else {
-          alert('Failed to delete account');
+          await deleteUserProfile(user.id);
         }
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        setActiveTab(null);
+        setIsDropdownOpen(false);
       } catch (e) {
         alert(e.message);
       }
@@ -85,6 +54,15 @@ export default function Header({ role, setRole, activeTab, setActiveTab, isAuthe
       setActiveTab(prev => (prev === 'Login' || prev === 'Signup' || prev === 'Profile' ? prev : null));
     }
   };
+
+  // Helper to get the avatar URL (works for both roles)
+  const avatarUrl = role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture;
+  const displayName = role === 'FOR RECRUITERS'
+    ? (user?.name || 'Company')
+    : `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User';
+  const fallbackInitial = role === 'FOR RECRUITERS'
+    ? (user?.name?.charAt(0) || 'R')
+    : (user?.firstName?.charAt(0) || 'U');
 
   const navLinks = role === 'FOR CANDIDATE'
     ? [
@@ -171,12 +149,10 @@ export default function Header({ role, setRole, activeTab, setActiveTab, isAuthe
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="w-8 h-8 rounded-full bg-[#333] border border-[#444] shadow-sm flex items-center justify-center overflow-hidden hover:border-[#ffa116] transition-colors focus:outline-none"
             >
-              {(role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture) ? (
-                <img src={getImageUrl(role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture)} alt="Profile" className="w-full h-full object-cover" />
+              {avatarUrl ? (
+                <img src={getImageUrl(avatarUrl)} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-sm font-bold text-[#ffa116]">
-                  {role === 'FOR RECRUITERS' ? (user?.name?.charAt(0) || 'R') : (user?.firstName?.charAt(0) || 'U')}
-                </span>
+                <span className="text-sm font-bold text-[#ffa116]">{fallbackInitial}</span>
               )}
             </button>
 
@@ -187,18 +163,14 @@ export default function Header({ role, setRole, activeTab, setActiveTab, isAuthe
                   className="w-full px-4 py-3 border-b border-[#333] flex items-center gap-3 hover:bg-[#333]/50 transition-colors text-left"
                 >
                   <div className="w-12 h-12 rounded-full bg-[#333] flex items-center justify-center overflow-hidden shrink-0">
-                    {(role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture) ? (
-                      <img src={getImageUrl(role === 'FOR RECRUITERS' ? (user?.logoUrl || user?.logo) : user?.profilePicture)} alt="Profile" className="w-full h-full object-cover" />
+                    {avatarUrl ? (
+                      <img src={getImageUrl(avatarUrl)} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xl font-bold text-[#ffa116]">
-                        {role === 'FOR RECRUITERS' ? (user?.name?.charAt(0) || 'R') : (user?.firstName?.charAt(0) || 'U')}
-                      </span>
+                      <span className="text-xl font-bold text-[#ffa116]">{fallbackInitial}</span>
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-base font-bold text-white truncate">
-                      {role === 'FOR RECRUITERS' ? user?.name : `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
-                    </span>
+                    <span className="text-base font-bold text-white truncate">{displayName}</span>
                     {role === 'FOR CANDIDATE' && (
                       <span className="text-[11px] font-medium text-[#ffa116] truncate mt-0.5">Access all features!</span>
                     )}
