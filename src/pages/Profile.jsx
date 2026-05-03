@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { updateCompany, uploadLogo } from '../services/companyService';
+import { updateCompany, uploadLogo, getCompany } from '../services/companyService';
 import { 
   updateUserProfile,
   addSkill, deleteSkill,
   addExperience, deleteExperience,
   addProject, deleteProject,
   uploadResume,
-  uploadProfilePicture
+  uploadProfilePicture,
+  getUserProfile
 } from '../services/userService';
 import ResumeViewer from '../components/ResumeViewer';
 import TranscriptViewer from '../components/TranscriptViewer';
@@ -26,20 +27,9 @@ export default function Profile({ role, setActiveTab, user, setUser, readOnly = 
     if (!user) {
       const fetchProfile = async () => {
         try {
-          const token = localStorage.getItem('token');
-          if (!token) throw new Error('Not authenticated');
-
-          const url = role === 'FOR RECRUITERS'
-            ? '/api/v1/company'
-            : '/api/v1/user';
-
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (!response.ok) throw new Error('Failed to fetch profile details');
-          const data = await response.json();
+          const data = role === 'FOR RECRUITERS'
+            ? await getCompany()
+            : await getUserProfile();
           setUser(data);
         } catch (err) {
           setError(err.message);
