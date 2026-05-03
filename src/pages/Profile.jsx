@@ -54,13 +54,19 @@ export default function Profile({ role, setActiveTab, user, setUser, readOnly = 
         const updated = await updateCompany(formData);
         setUser(updated);
       } else {
-        const payload = {
-          FirstName: formData.FirstName || formData.firstName || user?.firstName || '',
-          LastName: formData.LastName || formData.lastName || user?.lastName || '',
-          bio: formData.bio || user?.bio || '',
-          location: formData.location || user?.location || '',
-          phone: formData.phone || user?.phone || '',
-        };
+        const payload = {};
+        // Only send fields the user actually changed (keys present in formData)
+        // Map frontend field names to backend field names where they differ
+        const allowedFields = ['FirstName', 'LastName', 'bio', 'location', 'phone'];
+        allowedFields.forEach(key => {
+          if (Object.prototype.hasOwnProperty.call(formData, key)) {
+            payload[key] = formData[key] || null;
+          }
+        });
+        if (Object.keys(payload).length === 0) {
+          setSaving(false);
+          return; // nothing changed
+        }
         const updated = await updateUserProfile(user.id, payload);
         setUser(updated);
       }
